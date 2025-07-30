@@ -7,6 +7,7 @@ import time
 from typing import TYPE_CHECKING
 
 from mpd.asyncio import MPDClient
+from mpd.base import ConnectionError as MPDConnectionError
 from music_assistant_models.config_entries import ConfigEntry, ConfigValueType
 from music_assistant_models.enums import ConfigEntryType, PlayerFeature, PlayerState, PlayerType
 from music_assistant_models.errors import SetupFailedError
@@ -18,6 +19,7 @@ from music_assistant.constants import (
     CONF_PASSWORD,
     CONF_PORT,
 )
+from music_assistant.helpers.util import TaskManager
 from music_assistant.models.player_provider import PlayerProvider
 
 if TYPE_CHECKING:
@@ -145,9 +147,8 @@ class MusicPlayerDaemonProvider(PlayerProvider):
             self._mpd.consume(0),  # Consume Off
         )
 
-        # Listen for MPD updates
-        async for _ in self._mpd.idle(["player", "playlist", "mixer", "options"]):
-            await self._handle_player_update()
+        async with TaskManager(self.mass) as tg:
+            tg.create_task(self._handle_mpd_idle())
 
     async def unload(self, is_removed: bool = False) -> None:
         """
@@ -268,6 +269,18 @@ class MusicPlayerDaemonProvider(PlayerProvider):
         if not self.mass.players.get(player_id):
             return
         await self._handle_player_update()
+
+    async def _handle_mpd_idle(self) -> None:
+        """Listen for MPD Subsystem Updates."""
+        if not (player := self.mass.players.get(self._player_id)):
+            return
+
+        try:
+            async for _ in self._mpd.idle(["player", "playlist", "mixer", "options"]):
+                await self._handle_player_update()
+        except MPDConnectionError:
+            player.available = False
+            self.mass.players.update(self._player_id)
 
     async def _handle_player_update(self) -> None:
         """Query Status from MPD."""
