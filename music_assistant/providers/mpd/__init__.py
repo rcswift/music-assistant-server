@@ -274,26 +274,28 @@ class MusicPlayerDaemonProvider(PlayerProvider):
         if not (player := self.mass.players.get(self._player_id)):
             return
 
-        status, song = await asyncio.gather(self._mpd.status(), self._mpd.currentsong())
-
         player.available = self._mpd.connected
-        player.state = self._mpd_state[status["state"]]
 
-        if "elapsed" in status:
-            player.elapsed_time = float(status["elapsed"])
-        elif "time" in status:
-            player.elapsed_time = int(status["time"].split(":")[0])
-        else:
-            player.elapsed_time = 0
+        if player.available:
+            status, song = await asyncio.gather(self._mpd.status(), self._mpd.currentsong())
 
-        player.elapsed_time_last_updated = time.time()
+            player.state = self._mpd_state[status["state"]]
 
-        if "volume" in status:
-            player.volume_level = status["volume"]
+            if "elapsed" in status:
+                player.elapsed_time = float(status["elapsed"])
+            elif "time" in status:
+                player.elapsed_time = int(status["time"].split(":")[0])
+            else:
+                player.elapsed_time = 0
 
-        if "file" in song:
-            player.current_item_id = song["file"]
-        else:
-            player.current_item_id = ""
+            player.elapsed_time_last_updated = time.time()
+
+            if "volume" in status:
+                player.volume_level = status["volume"]
+
+            if "file" in song:
+                player.current_item_id = song["file"]
+            else:
+                player.current_item_id = ""
 
         self.mass.players.update(self._player_id)
