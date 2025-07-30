@@ -1,0 +1,11 @@
+{
+  "type": "player",
+  "domain": "mpd",
+  "name": "Music Player Daemon",
+  "description": "A flexible, powerful, server-side application for playing music.",
+  "codeowners": ["@rcswift"],
+  "requirements": ["python-mpd2==3.1.1"],
+  "documentation": "Link to the documentation on the music-assistant.io helppage (may be added later).",
+  "multi_instance": true,
+  "builtin": false
+}

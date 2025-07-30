@@ -43,6 +43,7 @@ PyChromecast==14.0.7
 pycryptodome==3.23.0
 pylast==5.5.0
 python-fullykiosk==0.0.14
+python-mpd2==3.1.1
 python-slugify==8.0.4
 pywidevine==1.8.0
 radios==0.3.2
