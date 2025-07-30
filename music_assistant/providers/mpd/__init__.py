@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from mpd.asyncio import MPDClient
 from music_assistant_models.config_entries import ConfigEntry, ConfigValueType
 from music_assistant_models.enums import ConfigEntryType, PlayerFeature, PlayerState, PlayerType
+from music_assistant_models.errors import SetupFailedError
 from music_assistant_models.player import DeviceInfo, Player, PlayerMedia
 
 from music_assistant.constants import (
@@ -101,10 +102,14 @@ class MusicPlayerDaemonProvider(PlayerProvider):
         if self.config.get_value(CONF_PASSWORD):
             self._mpd.password(self.config.get_value(CONF_PASSWORD))
 
-        await self._mpd.connect(
-            self.config.get_value(CONF_IP_ADDRESS),
-            self.config.get_value(CONF_PORT),
-        )
+        try:
+            await self._mpd.connect(
+                self.config.get_value(CONF_IP_ADDRESS),
+                self.config.get_value(CONF_PORT),
+            )
+        except Exception as err:
+            msg = f"Unable to start MPD connection ({err!s})"
+            raise SetupFailedError(msg) from err
 
     async def loaded_in_mass(self) -> None:
         """Call after the provider has been loaded."""
