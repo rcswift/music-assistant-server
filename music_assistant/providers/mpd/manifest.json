@@ -1,10 +1,12 @@
 {
   "type": "player",
-  "domain": "_demo_player_provider",
-  "name": "Demo Player Provider",
-  "description": "Test/Example Player Provider for Music Assistant.",
-  "codeowners": ["@yourgithubusername"],
-  "requirements": [],
-  "documentation": "https://music-assistant.io/player-support/demo/",
-  "mdns_discovery": ["_demo_service_type._tcp.local."]
+  "domain": "mpd",
+  "name": "Music Player Daemon",
+  "description": "A flexible, powerful, server-side application for playing music.",
+  "stage": "alpha",
+  "codeowners": ["@rcswift"],
+  "requirements": ["python-mpd2==3.1.1"],
+  "documentation": "Link to the documentation on the music-assistant.io helppage (may be added later).",
+  "multi_instance": true,
+  "builtin": false
 }
