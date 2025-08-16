@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from mpd.asyncio import MPDClient
 from music_assistant_models.enums import PlaybackState, PlayerFeature, PlayerType
 
-from music_assistant.models.player import Player, PlayerMedia
+from music_assistant.models.player import DeviceInfo, Player, PlayerMedia
 
 if TYPE_CHECKING:
     from .provider import MusicPlayerDaemonPlayerProvider
@@ -47,8 +47,27 @@ class MusicPlayerDaemonPlayer(Player):
             PlayerFeature.SEEK,
             PlayerFeature.ENQUEUE,
         }
+        self._attr_device_info = DeviceInfo(
+            ip_address=ip_address,
+        )
         self._needs_poll = False
         self._mpd = MPDClient()
+
+    @property
+    def needs_poll(self) -> bool:
+        """Return if the player needs to be polled for state updates."""
+        # MANDATORY
+        # this should return True if the player needs to be polled for state updates,
+        # If you player does not need to be polled, you can return False.
+        return False
+
+    @property
+    def poll_interval(self) -> int:
+        """Return the interval in seconds to poll the player for state updates."""
+        # OPTIONAL
+        # used in conjunction with the needs_poll property.
+        # this should return the interval in seconds to poll the player for state updates.
+        return 5 if self.playback_state == PlaybackState.PLAYING else 30
 
     async def setup(self) -> None:
         """Set up the player."""
@@ -150,6 +169,10 @@ class MusicPlayerDaemonPlayer(Player):
         await self._mpd.add(media.uri)
         self.update_state()
 
+    async def poll(self) -> None:
+        """Poll player for state updates."""
+        await self.get_mpd_status()
+
     async def on_unload(self) -> None:
         """Handle logic when the player is unloaded from the Player controller."""
         logger = self.provider.logger.getChild(self.player_id)
@@ -158,12 +181,21 @@ class MusicPlayerDaemonPlayer(Player):
 
     async def get_mpd_status(self) -> None:
         """Update/set (dynamic) properties."""
+        logger = self.provider.logger.getChild(self.player_id)
         if self._mpd.connected:
             self._attr_available = True
             status, song = await asyncio.gather(self._mpd.status(), self._mpd.currentsong())
+
             # State
             if "state" in status:
                 self._attr_playback_state = PLAYBACK_STATE_MAP[status["state"]]
+            logger.debug(f"PlaybackState : {self._attr_playback_state}")
+
+            # Volume
+            if "volume" in status:
+                self._attr_volume_level = status["volume"]
+            logger.debug(f"VolumeLevel : {self._attr_volume_level}")
+
             # Elapsed Time
             if "elapsed" in status:
                 self._attr_elapsed_time = float(status["elapsed"])
@@ -172,14 +204,7 @@ class MusicPlayerDaemonPlayer(Player):
             else:
                 self._attr_elapsed_time = 0
             self._attr_elapsed_time_last_updated = time.time()
-            # Volume
-            if "volume" in status:
-                self._attr_volume_level = status["volume"]
-            # Media
-            if "file" in song:
-                self.set_current_media(song["file"])
-            else:
-                self.set_current_media("")
+            logger.debug(f"ElapsedTime : {self._attr_elapsed_time}")
         else:
             self._attr_available = False
         self.update_state()
