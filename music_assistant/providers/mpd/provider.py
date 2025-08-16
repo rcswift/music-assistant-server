@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from zeroconf import ServiceStateChange
 
@@ -108,38 +108,32 @@ class MusicPlayerDaemonPlayerProvider(PlayerProvider):
 
         self.logger.debug(f"Handling MDNS Update for {player_id}")
 
+        mass_player: MusicPlayerDaemonPlayer | None
+
         # handle removed player
         if state_change == ServiceStateChange.Removed:
             # check if the player manager has an existing entry for this player
-            if mass_player := self.mass.players.get(player_id):
+            if mass_player := cast(
+                "MusicPlayerDaemonPlayer | None", self.mass.players.get(player_id)
+            ):
                 # the player has become unavailable
-                self.logger.debug("Player offline: %s", mass_player.display_name)
+                self.logger.info("Player offline: %s", mass_player.display_name)
                 await self.mass.players.unregister(player_id)
             return
 
         # handle update for existing device
-        # (state change is either updated or added)
-        # check if we have an existing player in the player manager
-        # note that you can use this point to update the player connection info
-        # if that changed (e.g. ip address)
-        if mass_player := self.mass.players.get(player_id):
+        if mass_player := cast("MusicPlayerDaemonPlayer | None", self.mass.players.get(player_id)):
             # existing player found in the player manager,
             # this is an existing player that has been updated/reconnected
             # or simply a re-announcement on mdns.
-            if ip_address and ip_address != mass_player.device_info.ip_address:
-                self.logger.debug(
-                    "Address updated to %s for player %s", ip_address, mass_player.display_name
-                )
-            # inform the player manager of any changes to the player object
-            # note that you would normally call this from some other callback from
-            # the player's native api/library which informs you of changes in the player state.
-            # as a last resort you can also choose to let the player manager
-            # poll the player for state changes
-            mass_player.update_state()
-            return
+            if ip_address and ip_address == mass_player.device_info.ip_address:
+                if not mass_player.available:
+                    self.logger.info(f"Player {mass_player.display_name} reconnected")
+                    await mass_player.setup()
+                    return
 
         # handle new player
-        self.logger.debug("Discovered device %s on %s", name, ip_address)
+        self.logger.info("Discovered device %s on %s", name, ip_address)
 
         mpd_player = MusicPlayerDaemonPlayer(self, player_id, ip_address, port)
         await mpd_player.setup()
